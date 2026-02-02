@@ -1,0 +1,1 @@
+Connecting to (sync): postgresql+psycopg2://postgres:password@localhost:5432/devboard

@@ -1,0 +1,1 @@
+Connecting to: postgresql+psycopg://postgres:password@localhost:5432/devboard
