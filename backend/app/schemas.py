@@ -24,3 +24,26 @@ class UserResponse(BaseModel):
     name: str
     class Config:
         from_attributes = True
+
+# Client
+class ClientCreate(BaseModel):
+    name: str
+    notes: Optional[str] = None
+
+class ClientResponse(ClientCreate):
+    id: UUID
+    class Config:
+        from_attributes = True
+
+# Project
+class ProjectCreate(BaseModel):
+    client_id: UUID
+    name: str
+    description: Optional[str] = None
+    currency: str = "BRL"
+    hourly_rate_override: Optional[float] = None
+
+class ProjectResponse(ProjectCreate):
+    id: UUID
+    class Config:
+        from_attributes = True
