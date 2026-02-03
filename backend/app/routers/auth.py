@@ -42,15 +42,22 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
     
+    user_id = str(uuid.uuid4())
     new_user = User(
+        id=user_id,
         email=user.email,
         name=user.name,
         password_hash=get_password_hash(user.password)
     )
     db.add(new_user)
     await db.commit()
-    await db.refresh(new_user)
-    return new_user
+    # Skipped refresh to avoid MissingGreenlet
+    
+    return {
+        "id": user_id,
+        "email": new_user.email,
+        "name": new_user.name
+    }
 
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
