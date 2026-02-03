@@ -16,3 +16,7 @@ build/
 .vscode/
 coverage/
 htmlcov/
+backend/backend_log*.txt
+backend/*_error.txt
+backend/*_result.txt
+
