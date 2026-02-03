@@ -142,3 +142,55 @@ class TimesheetPeriod(Base):
     end_date: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     locked: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     locked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+# =============================================================================
+# GitHub Integration Models (Phase 2)
+# =============================================================================
+
+class GithubInstallation(Base):
+    """Stores user's GitHub OAuth/App credentials securely."""
+    __tablename__ = "github_installations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    
+    # GitHub App specific
+    installation_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    
+    # Tokens (should be encrypted at application level before storage)
+    access_token_encrypted: Mapped[str] = mapped_column(String, nullable=False)
+    refresh_token_encrypted: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    token_expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # OAuth scopes
+    scopes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user: Mapped["User"] = relationship("User")
+    repo_links: Mapped[List["GithubRepoLink"]] = relationship("GithubRepoLink", back_populates="installation")
+
+
+class GithubRepoLink(Base):
+    """Links GitHub repositories to DevBoard projects."""
+    __tablename__ = "github_repo_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
+    github_installation_id: Mapped[str] = mapped_column(String(36), ForeignKey("github_installations.id"), nullable=False)
+    
+    # GitHub repo identifiers
+    repo_id: Mapped[int] = mapped_column(Integer, nullable=False)  # GitHub's numeric ID
+    owner: Mapped[str] = mapped_column(String, nullable=False)     # Org or user
+    name: Mapped[str] = mapped_column(String, nullable=False)      # Repo name
+    full_name: Mapped[str] = mapped_column(String, nullable=False) # owner/name
+    default_branch: Mapped[str] = mapped_column(String, default="main")
+    
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project")
+    installation: Mapped["GithubInstallation"] = relationship("GithubInstallation", back_populates="repo_links")
