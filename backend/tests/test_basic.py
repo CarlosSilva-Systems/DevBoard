@@ -15,7 +15,9 @@ import uuid
 async def test_root():
     async with AsyncClient(app=app, base_url="http://test") as ac:
         response = await ac.get("/")
-        assert response.status_code == 404 # No root
+        assert response.status_code == 200 
+        assert response.json() == {"message": "Welcome to DevBoard BI API"}
+
 
 # Note: Complete setup requires conftest.py with DB fixture.
 # I will create a basic logic test for now that doesn't hit DB if possible, or fail if no DB.
