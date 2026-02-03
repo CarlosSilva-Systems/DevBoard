@@ -16,8 +16,18 @@ def test_github_integration_router_exists():
 
 
 @pytest.mark.asyncio
-async def test_github_connect_redirects():
-    """GET /integrations/github/connect should redirect to GitHub OAuth."""
+async def test_github_connect_requires_auth():
+    """GET /integrations/github/connect requires authentication."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+        response = await ac.get("/integrations/github/connect")
+        # Should require auth (401) since we're not logged in
+        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_github_connect_redirects_when_authenticated():
+    """GET /integrations/github/connect redirects to GitHub OAuth when authenticated."""
     # Mock the settings to have a client ID
     with patch('app.routers.github_integration.settings') as mock_settings:
         mock_settings.GITHUB_CLIENT_ID = "test_client_id"
@@ -25,12 +35,32 @@ async def test_github_connect_redirects():
         
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
-            response = await ac.get("/integrations/github/connect")
-            # Should be a redirect (302 or 307)
-            assert response.status_code in [302, 307], f"Expected redirect, got {response.status_code}"
-            # Should redirect to GitHub
-            location = response.headers.get("location", "")
-            assert "github.com" in location, f"Expected GitHub redirect, got {location}"
+            # Register and login first
+            email = "connect_test@example.com"
+            password = "testpass123"
+            
+            await ac.post("/auth/register", json={
+                "email": email,
+                "password": password,
+                "name": "Connect Test"
+            })
+            
+            login_resp = await ac.post("/auth/login", data={
+                "username": email,
+                "password": password
+            })
+            
+            if login_resp.status_code == 200:
+                token = login_resp.json()["access_token"]
+                
+                response = await ac.get("/integrations/github/connect", headers={
+                    "Authorization": f"Bearer {token}"
+                })
+                # Should be a redirect (302 or 307)
+                assert response.status_code in [302, 307], f"Expected redirect, got {response.status_code}"
+                # Should redirect to GitHub
+                location = response.headers.get("location", "")
+                assert "github.com" in location, f"Expected GitHub redirect, got {location}"
 
 
 @pytest.mark.asyncio

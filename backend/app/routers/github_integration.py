@@ -1,6 +1,6 @@
 """
-GitHub Integration Router - OAuth Flow
-Handles GitHub OAuth authorization and token management.
+GitHub Integration Router
+OAuth flow and connection status endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
@@ -18,37 +18,35 @@ from ..routers.auth import get_current_user
 
 router = APIRouter(prefix="/integrations/github", tags=["github"])
 
-# In-memory state storage (for MVP; use Redis in production)
-_oauth_states: dict[str, datetime] = {}
+# State storage: state_token -> (user_id, created_at)
+# TODO: Replace with Redis for multi-instance deployments
+_oauth_states: dict[str, tuple[str, datetime]] = {}
 
 
-def _generate_state() -> str:
-    """Generate a secure random state for CSRF protection."""
+def _generate_state(user_id: str) -> str:
+    """Generate state token bound to user."""
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = datetime.now(timezone.utc)
+    _oauth_states[state] = (user_id, datetime.now(timezone.utc))
     return state
 
 
-def _validate_state(state: str) -> bool:
-    """Validate and consume an OAuth state token."""
+def _validate_and_consume_state(state: str) -> Optional[str]:
+    """Validate state and return user_id. Returns None if invalid/expired."""
     if state not in _oauth_states:
-        return False
-    created = _oauth_states.pop(state)
-    # State expires after 10 minutes
+        return None
+    user_id, created = _oauth_states.pop(state)
     if datetime.now(timezone.utc) - created > timedelta(minutes=10):
-        return False
-    return True
+        return None
+    return user_id
 
 
 @router.get("/connect")
-async def github_connect():
-    """
-    Redirect user to GitHub OAuth authorization page.
-    """
+async def github_connect(current_user: User = Depends(get_current_user)):
+    """Initiate GitHub OAuth flow."""
     if not settings.GITHUB_CLIENT_ID:
         raise HTTPException(status_code=500, detail="GitHub integration not configured")
     
-    state = _generate_state()
+    state = _generate_state(current_user.id)
     
     github_auth_url = (
         f"https://github.com/login/oauth/authorize"
@@ -68,25 +66,20 @@ async def github_callback(
     error: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Handle GitHub OAuth callback.
-    Exchange code for access token and store in database.
-    """
-    # Handle GitHub errors
+    """Handle GitHub OAuth callback and persist installation."""
     if error:
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/settings/integrations?error={error}",
             status_code=302
         )
     
-    # Validate required parameters
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code")
     
-    if not state or not _validate_state(state):
+    user_id = _validate_and_consume_state(state) if state else None
+    if not user_id:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
     
-    # Exchange code for access token
     try:
         async with httpx.AsyncClient() as client:
             token_response = await client.post(
@@ -112,11 +105,27 @@ async def github_callback(
                 )
             
             access_token = token_data.get("access_token")
-            token_type = token_data.get("token_type")
             scope = token_data.get("scope", "")
             
-            # TODO: Get current user from session/cookie (for now, redirect with token for frontend to handle)
-            # In production, you'd associate this with the logged-in user
+            # Upsert GithubInstallation
+            result = await db.execute(
+                select(GithubInstallation).where(GithubInstallation.user_id == user_id)
+            )
+            installation = result.scalars().first()
+            
+            if installation:
+                installation.access_token_encrypted = access_token  # TODO: encrypt
+                installation.scopes = scope
+                installation.updated_at = datetime.now(timezone.utc)
+            else:
+                installation = GithubInstallation(
+                    user_id=user_id,
+                    access_token_encrypted=access_token,  # TODO: encrypt
+                    scopes=scope
+                )
+                db.add(installation)
+            
+            await db.commit()
             
             return RedirectResponse(
                 url=f"{settings.FRONTEND_URL}/settings/integrations?success=true",
@@ -132,20 +141,14 @@ async def github_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get GitHub connection status for the current user.
-    """
+    """Get current user's GitHub connection status."""
     result = await db.execute(
         select(GithubInstallation).where(GithubInstallation.user_id == current_user.id)
     )
     installation = result.scalars().first()
     
     if not installation:
-        return {
-            "connected": False,
-            "scopes": None,
-            "expires_at": None
-        }
+        return {"connected": False, "scopes": None, "expires_at": None}
     
     return {
         "connected": True,
