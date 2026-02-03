@@ -18,14 +18,19 @@ def test_github_integration_router_exists():
 @pytest.mark.asyncio
 async def test_github_connect_redirects():
     """GET /integrations/github/connect should redirect to GitHub OAuth."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
-        response = await ac.get("/integrations/github/connect")
-        # Should be a redirect (302 or 307)
-        assert response.status_code in [302, 307], f"Expected redirect, got {response.status_code}"
-        # Should redirect to GitHub
-        location = response.headers.get("location", "")
-        assert "github.com" in location, f"Expected GitHub redirect, got {location}"
+    # Mock the settings to have a client ID
+    with patch('app.routers.github_integration.settings') as mock_settings:
+        mock_settings.GITHUB_CLIENT_ID = "test_client_id"
+        mock_settings.GITHUB_REDIRECT_URI = "http://localhost:8000/integrations/github/callback"
+        
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+            response = await ac.get("/integrations/github/connect")
+            # Should be a redirect (302 or 307)
+            assert response.status_code in [302, 307], f"Expected redirect, got {response.status_code}"
+            # Should redirect to GitHub
+            location = response.headers.get("location", "")
+            assert "github.com" in location, f"Expected GitHub redirect, got {location}"
 
 
 @pytest.mark.asyncio

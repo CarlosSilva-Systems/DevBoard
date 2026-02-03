@@ -5,7 +5,7 @@ if sys.platform == 'win32':
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth, clients_projects, kanban, time_entries, reports
+from .routers import auth, clients_projects, kanban, time_entries, reports, github_integration
 from .config import settings
 from .database import get_db
 
@@ -33,6 +33,7 @@ app.include_router(clients_projects.router, prefix="/api", tags=["Clients & Proj
 app.include_router(kanban.router, prefix="/api", tags=["Kanban"])
 app.include_router(time_entries.router, prefix="/api", tags=["Time Tracking"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(github_integration.router)  # Uses its own prefix /integrations/github
 
 @app.get("/seed")
 async def seed_data(db=Depends(get_db)):
