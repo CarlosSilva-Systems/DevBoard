@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, String, DateTime, Float, Boolean, Text
+from sqlalchemy import ForeignKey, Integer, BigInteger, String, DateTime, Float, Boolean, Text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from .database import Base
@@ -182,7 +182,7 @@ class GithubRepoLink(Base):
     github_installation_id: Mapped[str] = mapped_column(String(36), ForeignKey("github_installations.id"), nullable=False)
     
     # GitHub repo identifiers
-    repo_id: Mapped[int] = mapped_column(Integer, nullable=False)  # GitHub's numeric ID
+    repo_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # GitHub's numeric ID (64-bit)
     owner: Mapped[str] = mapped_column(String, nullable=False)     # Org or user
     name: Mapped[str] = mapped_column(String, nullable=False)      # Repo name
     full_name: Mapped[str] = mapped_column(String, nullable=False) # owner/name
