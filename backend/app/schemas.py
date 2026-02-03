@@ -96,3 +96,24 @@ class TaskResponse(TaskCreate):
     updated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+# TimeEntry
+class TimeEntryCreate(BaseModel):
+    duration_minutes: Optional[int] = None # For manual
+    date: Optional[datetime] = None # For manual
+    notes: Optional[str] = None
+    billable: Optional[bool] = True
+
+class TimeEntryResponse(BaseModel):
+    id: UUID
+    task_id: UUID
+    start_at: Optional[datetime]
+    end_at: Optional[datetime]
+    duration_seconds: int
+    mode: str
+    notes: Optional[str]
+    billable: bool
+    locked: bool
+    created_at: datetime
+    class Config:
+        from_attributes = True

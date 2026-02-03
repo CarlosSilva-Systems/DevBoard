@@ -24,7 +24,7 @@ class User(Base):
 
     clients: Mapped[List["Client"]] = relationship("Client", back_populates="user")
     projects: Mapped[List["Project"]] = relationship("Project", back_populates="user")
-    # rate_settings: Mapped[Optional["RateSettings"]] = relationship("RateSettings", back_populates="user", uselist=False)
+    rate_settings: Mapped[Optional["RateSettings"]] = relationship("RateSettings", back_populates="user", uselist=False)
 
 class Client(Base):
     __tablename__ = "clients"
@@ -100,4 +100,45 @@ class Task(Base):
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     column: Mapped["Column"] = relationship("Column", back_populates="tasks")
-    # time_entries: Mapped[List["TimeEntry"]] = relationship("TimeEntry", back_populates="task")
+    time_entries: Mapped[List["TimeEntry"]] = relationship("TimeEntry", back_populates="task")
+
+class TimeEntry(Base):
+    __tablename__ = "time_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    
+    start_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    mode: Mapped[Optional[str]] = mapped_column(String, default="timer")
+    notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    billable: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    locked: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    task: Mapped["Task"] = relationship("Task", back_populates="time_entries")
+    user: Mapped["User"] = relationship("User") 
+
+class RateSettings(Base):
+    __tablename__ = "rate_settings"
+    
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, unique=True)
+    base_hourly_rate: Mapped[Optional[float]] = mapped_column(Float, default=0.0)
+    internal_cost_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    target_margin_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="rate_settings")
+
+class TimesheetPeriod(Base):
+    __tablename__ = "timesheet_periods"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    start_date: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_date: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    locked: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    locked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
