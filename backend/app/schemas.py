@@ -47,3 +47,52 @@ class ProjectResponse(ProjectCreate):
     id: UUID
     class Config:
         from_attributes = True
+
+# Board
+class BoardCreate(BaseModel):
+    name: str
+
+class BoardResponse(BaseModel):
+    id: UUID
+    name: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+# Column
+class ColumnCreate(BaseModel):
+    name: str
+    position: Optional[int] = 0
+    wip_limit: Optional[int] = None
+
+class ColumnResponse(ColumnCreate):
+    id: UUID
+    board_id: UUID
+    class Config:
+        from_attributes = True
+
+# Task
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    priority: Optional[str] = "med"
+    type: Optional[str] = "feature"
+    complexity: Optional[int] = 1
+    estimated_minutes: Optional[int] = None
+    billable: Optional[bool] = True
+    status: Optional[str] = "open"
+    tags: Optional[str] = None
+
+class TaskMove(BaseModel):
+    column_id: UUID
+    position: float
+
+class TaskResponse(TaskCreate):
+    id: UUID
+    board_id: UUID
+    column_id: UUID
+    position: float
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
