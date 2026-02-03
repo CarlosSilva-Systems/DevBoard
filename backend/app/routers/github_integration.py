@@ -105,7 +105,17 @@ async def github_callback(
                 )
             
             access_token = token_data.get("access_token")
+            if not access_token:
+                raise HTTPException(status_code=502, detail="GitHub did not return an access token")
+
             scope = token_data.get("scope", "")
+            expires_in = token_data.get("expires_in")
+            token_expires_at = (
+                datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                if expires_in
+                else None
+            )
+            refresh_token = token_data.get("refresh_token")
             
             # Upsert GithubInstallation
             result = await db.execute(
@@ -115,12 +125,16 @@ async def github_callback(
             
             if installation:
                 installation.access_token_encrypted = access_token  # TODO: encrypt
+                installation.refresh_token_encrypted = refresh_token  # TODO: encrypt
                 installation.scopes = scope
+                installation.token_expires_at = token_expires_at
                 installation.updated_at = datetime.now(timezone.utc)
             else:
                 installation = GithubInstallation(
                     user_id=user_id,
                     access_token_encrypted=access_token,  # TODO: encrypt
+                    refresh_token_encrypted=refresh_token,  # TODO: encrypt
+                    token_expires_at=token_expires_at,
                     scopes=scope
                 )
                 db.add(installation)
