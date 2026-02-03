@@ -15,6 +15,7 @@ interface GitHubStatus {
 export function GitHubConnectionCard() {
     const [status, setStatus] = useState<GitHubStatus | null>(null);
     const [loading, setLoading] = useState(true);
+    const [connecting, setConnecting] = useState(false);
 
     useEffect(() => {
         fetchStatus();
@@ -42,10 +43,22 @@ export function GitHubConnectionCard() {
         }
     };
 
-    const handleConnect = () => {
-        // Redirect to backend OAuth endpoint
-        const token = localStorage.getItem('token');
-        window.location.href = `/integrations/github/connect?token=${token}`;
+    const handleConnect = async () => {
+        setConnecting(true);
+        try {
+            const data = await api.post('/integrations/github/connect', {});
+            const redirectUrl = data?.redirect_url ?? data?.url;
+            if (redirectUrl) {
+                window.location.href = redirectUrl;
+                return;
+            }
+            window.location.href = '/integrations/github/connect';
+        } catch (e) {
+            console.error('Failed to start GitHub connection', e);
+            toast.error('Failed to start GitHub connection');
+        } finally {
+            setConnecting(false);
+        }
     };
 
     if (loading) {
@@ -95,15 +108,31 @@ export function GitHubConnectionCard() {
                                 <span className="font-mono text-xs">{status.scopes}</span>
                             </div>
                         )}
-                        <Button variant="outline" size="sm" onClick={handleConnect}>
-                            Reconnect
+                        <Button variant="outline" size="sm" onClick={handleConnect} disabled={connecting}>
+                            {connecting ? (
+                                <>
+                                    <Loader2 className="size-4 animate-spin" />
+                                    Reconnecting
+                                </>
+                            ) : (
+                                'Reconnect'
+                            )}
                         </Button>
                     </div>
                 ) : (
-                    <Button onClick={handleConnect} className="gap-2">
-                        <Github className="size-4" />
-                        Connect GitHub
-                        <ExternalLink className="size-3" />
+                    <Button onClick={handleConnect} className="gap-2" disabled={connecting}>
+                        {connecting ? (
+                            <>
+                                <Loader2 className="size-4 animate-spin" />
+                                Connecting
+                            </>
+                        ) : (
+                            <>
+                                <Github className="size-4" />
+                                Connect GitHub
+                                <ExternalLink className="size-3" />
+                            </>
+                        )}
                     </Button>
                 )}
             </CardContent>
